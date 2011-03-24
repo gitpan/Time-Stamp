@@ -37,6 +37,7 @@
       "runtime" : {
          "requires" : {
             "Sub::Exporter" : "0.982",
+            "Time::Local" : 0,
             "perl" : "5.006"
          }
       },
@@ -44,15 +45,14 @@
          "requires" : {
             "File::Find" : 0,
             "File::Temp" : 0,
-            "Test::More" : "0.96",
-            "Time::Local" : 0
+            "Test::More" : "0.96"
          }
       }
    },
    "provides" : {
       "Time::Stamp" : {
          "file" : "lib/Time/Stamp.pm",
-         "version" : "1.000"
+         "version" : "1.001"
       }
    },
    "release_status" : "stable",
@@ -68,7 +68,7 @@
          "web" : "http://github.com/magnificent-tears/Time-Stamp/tree"
       }
    },
-   "version" : "1.000",
+   "version" : "1.001",
    "x_Dist_Zilla" : {
       "plugins" : [
          {

@@ -12,6 +12,7 @@ t/000-report-versions-tiny.t
 t/exports.t
 t/format.t
 t/imports.t
+t/parse.t
 t/release-cpan-changes.t
 t/release-distmeta.t
 t/release-kwalitee.t

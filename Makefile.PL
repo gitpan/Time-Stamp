@@ -15,8 +15,7 @@ my %WriteMakefileArgs = (
     'File::Find' => '0',
     'File::Temp' => '0',
     'ExtUtils::MakeMaker' => '6.31',
-    'Test::More' => '0.96',
-    'Time::Local' => '0'
+    'Test::More' => '0.96'
   },
   'CONFIGURE_REQUIRES' => {
     'ExtUtils::MakeMaker' => '6.31'
@@ -26,9 +25,10 @@ my %WriteMakefileArgs = (
   'LICENSE' => 'perl',
   'NAME' => 'Time::Stamp',
   'PREREQ_PM' => {
-    'Sub::Exporter' => '0.982'
+    'Sub::Exporter' => '0.982',
+    'Time::Local' => '0'
   },
-  'VERSION' => '1.000',
+  'VERSION' => '1.001',
   'test' => {
     'TESTS' => 't/*.t'
   }

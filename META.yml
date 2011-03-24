@@ -7,7 +7,6 @@ build_requires:
   File::Temp: 0
   Module::Build: 0.3601
   Test::More: 0.96
-  Time::Local: 0
 configure_requires:
   Module::Build: 0.3601
 dynamic_config: 0
@@ -28,15 +27,16 @@ no_index:
 provides:
   Time::Stamp:
     file: lib/Time/Stamp.pm
-    version: 1.000
+    version: 1.001
 requires:
   Sub::Exporter: 0.982
+  Time::Local: 0
   perl: 5.006
 resources:
   bugtracker: http://rt.cpan.org/Public/Dist/Display.html?Name=Time-Stamp
   homepage: http://github.com/magnificent-tears/Time-Stamp/tree
   repository: git://github.com/magnificent-tears/Time-Stamp.git
-version: 1.000
+version: 1.001
 x_Dist_Zilla:
   plugins:
     -

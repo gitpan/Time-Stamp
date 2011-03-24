@@ -9,7 +9,7 @@
 #
 package Time::Stamp;
 BEGIN {
-  $Time::Stamp::VERSION = '1.000';
+  $Time::Stamp::VERSION = '1.001';
 }
 BEGIN {
   $Time::Stamp::AUTHORITY = 'cpan:RWSTAUNER';
@@ -25,9 +25,12 @@ use Sub::Exporter 0.982 -setup => {
   exports => [
     localstamp => \'_build_localstamp',
     gmstamp    => \'_build_gmstamp',
+    parsegm    => \'_build_parsestamp',
+    parselocal => \'_build_parsestamp',
   ],
   groups => [
     stamps => [qw(localstamp gmstamp)],
+    parsers => [qw(parselocal parsegm)],
   ]
 };
 
@@ -81,6 +84,36 @@ sub _build_gmstamp {
   };
 }
 
+sub _build_parsestamp {
+  my ($class, $name, $arg, $col) = @_;
+
+  # pre-compile the regexp
+  my $regexp = exists $arg->{regexp}
+    ? qr/$arg->{regexp}/
+    : qr/^ (\d{4}) \D* (\d{2}) \D* (\d{2}) \D*
+           (\d{2}) \D* (\d{2}) \D* (\d{2} (?:\.\d+)?) .* $/x;
+
+  require Time::Local; # core
+  my $time = $name eq 'parsegm'
+    ? \&Time::Local::timegm
+    : \&Time::Local::timelocal;
+
+  return sub {
+    my ($stamp) = @_;
+    # coerce strings into numbers (map { int } would not work for fractions)
+    my @time = reverse map { $_ + 0 } ($stamp =~ $regexp);
+
+    # if the regexp didn't match (empty list) give up now
+    return
+      if !@time;
+
+    $time[5] -= 1900; # year
+    $time[4] -= 1;    # month
+
+    return wantarray ? @time : &$time(@time);
+  };
+}
+
 sub _format {
   my ($arg) = @_;
 
@@ -110,7 +143,12 @@ sub _ymdhms {
 
 # define default localstamp and gmstamp in this package
 # so that exporting is not strictly required
-__PACKAGE__->import(qw(localstamp gmstamp));
+__PACKAGE__->import(qw(
+  localstamp
+  gmstamp
+  parsegm
+  parselocal
+));
 
 1;
 
@@ -118,9 +156,9 @@ __PACKAGE__->import(qw(localstamp gmstamp));
 __END__
 =pod
 
-=for :stopwords Randy Stauner TODO timestamp gmstamp localstamp UTC cpan testmatrix url
-annocpan anno bugtracker rt cpants kwalitee diff irc mailto metadata
-placeholders
+=for :stopwords Randy Stauner TODO timestamp gmstamp localstamp UTC parsegm parselocal cpan
+testmatrix url annocpan anno bugtracker rt cpants kwalitee diff irc mailto
+metadata placeholders
 
 =head1 NAME
 
@@ -128,29 +166,43 @@ Time::Stamp - Easy, readable, efficient timestamp functions
 
 =head1 VERSION
 
-version 1.000
+version 1.001
 
 =head1 SYNOPSIS
 
+  # import customized functions to make simple, readable timestamps
+
   use Time::Stamp 'gmstamp';
+  my $now = gmstamp();
+  my $mtime = gmstamp( (stat($file))[9] );
 
   use Time::Stamp localstamp => { -as => 'ltime', format => 'compact' };
 
   use Time::Stamp -stamps => { dt_sep => ' ', date_sep => '/' };
 
-  # the default configurations of localstamp and gmstamp
+  # inverse functions to parse the stamps
+
+  use Time::Stamp 'parsegm';
+  my $seconds = parsegm($stamp);
+
+  use Time::Stamp parselocal => { -as => 'parsel', regexp => qr/$pattern/ };
+
+  use Time::Stamp -parsers => { regexp => qr/$pattern/ };
+
+  # the default configurations of each function
   # are available without importing into your namespace
-  # but this is probably less useful
+
   $stamp = Time::Stamp::gmstamp($time);
+  $time  = Time::Stamp::parsegm($stamp);
 
 =head1 DESCRIPTION
 
 This module makes it easy to include timestamp functions
 that are simple, easily readable, and fast.
 For simple timestamps perl's built-in functions are all you need:
-C<time|perlfunc/time>,
-C<gmtime|perlfunc/gmtime> (or C<localtime|perlfunc/localtime>),
-and C<sprintf|perlfunc/sprintf>...
+L<time|perlfunc/time>,
+L<gmtime|perlfunc/gmtime> (or L<localtime|perlfunc/localtime>),
+and L<sprintf|perlfunc/sprintf>...
 
 Sometimes you desire a simple timestamp to add to a file name
 or use as part of a generated data identifier.
@@ -165,8 +217,8 @@ This integer timestamp works for these purposes,
 but it's not easy to read.
 
 If you're looking at a list of timestamps you have to fire up a perl
-interpreter and copy and paste the timestamp into L<localtime()|perlfunc/time>
-to figure out when that actually was.
+interpreter and copy and paste the timestamp into
+L<localtime()|perlfunc/localtime> to figure out when that actually was.
 
 You can pass the timestamp to C<scalar localtime($sec)>
 (or C<scalar gmtime($sec)>)
@@ -178,7 +230,7 @@ and contains characters that aren't friendly for file names or URIs
 See L<perlport/Time and Date> for more discussion on useful timestamps.
 
 For simple timestamps you can get the data you need from
-L<perlfunc/localtime> and L<perlfunc/gmtime>
+L<localtime|perlfunc/localtime> and L<gmtime|perlfunc/gmtime>
 without incurring the resource cost of L<DateTime>
 (or any other object for that matter).
 
@@ -266,16 +318,26 @@ This module uses L<Sub::Exporter>
 to enable you to customize your timestamp function
 but still create it as easily as possible.
 
-The customizations to the format are done at import
+The customizations are done at import
 and stored in the custom function returned
 to make the resulting function as fast as possible.
 
-Each export accepts any of the keys listed in L</FORMAT>
+The following groups and functions are available for export
+(nothing is exported by default):
+
+=head2 -stamps
+
+This is a convenience group for importing both L</gmstamp> and L</localstamp>.
+
+Each timestamp export accepts any of the keys listed in L</FORMAT>
 as well as C<format> which can be the name of a predefined format.
+
+  use Time::Stamp '-stamps';
+  use Time::Stamp  -stamps => { format => 'compact' };
 
   use Time::Stamp gmstamp => { dt_sep => ' ', tz => ' UTC' };
 
-  use Time::Stamp gmstamp => { -as => shorttime, format => 'compact' };
+  use Time::Stamp localstamp => { -as => shorttime, format => 'compact' };
 
 Each timestamp function will return a string according to the time as follows:
 
@@ -301,10 +363,7 @@ the function and don't want to do it again.
 Most commonly the 0 or 1 argument form would be used,
 but the shortcut of using a time array is provided
 in case you already have the array so that you don't have to use
-C<Time::Local> just to get the integer back.
-
-The following functions are available for export
-(nothing is exported by default):
+L<Time::Local> just to get the integer back.
 
 =head2 gmstamp
 
@@ -312,7 +371,7 @@ The following functions are available for export
   $stamp = gmstamp($seconds);
   $stamp = gmstamp(@gmtime);
 
-Returns a string according to the format specified in the import call.
+This returns a string according to the format specified in the import call.
 
 By default this function sets C<tz> to C<'Z'>
 since C<gmtime()> returns values in C<UTC> (no time zone offset).
@@ -326,16 +385,66 @@ and useful for transmitting to another computer.
   $stamp = localstamp($seconds);
   $stamp = localstamp(@localtime);
 
-Returns a string according to the format specified in the import call.
+This returns a string according to the format specified in the import call.
 
 By default this function does not include a time zone indicator.
 
 This function can be useful for log files or other values that stay
 on the machine where time zone is not important and/or is constant.
 
-=head2 -stamps
+=head2 -parsers
 
-This is a convenience group for importing both L</gmstamp> and L</localstamp>.
+This is a convenience group for importing both L</parsegm> and L</parselocal>.
+
+  use Time::Stamp '-parsers';
+  use Time::Stamp  -parsers => { regexp => qr/pattern/ };
+
+  use Time::Stamp 'parsegm';
+
+  use Time::Stamp  parselocal => { -as => 'parsestamp', regexp => qr/pattern/ };
+
+The parser functions are the inverse of the stamp functions.
+They accept a timestamp and use the appropriate function from L<Time::Local>
+to turn it back into a seconds-since-epoch integer.
+
+In list context they return the list that would have been sent to L<Time::Local>
+which is similar to the one returned by
+L<gmtime|perlfunc/gmtime> and L<localtime|perlfunc/localtime>:
+seconds, minutes, hours, day, month (0-11), year (-1900).
+B<NOTE> that the C<wday>, C<yday>, and C<isdst> parameters
+(the last three elements returned from C<localtime> or C<gmtime>)
+are not returned because they are not easily determined from the stamp.
+Besides L<Time::Local> only takes the first 6 anyway.
+
+If the stamp doesn't match the pattern
+the function will return undef in scalar context
+or an empty list in list context.
+
+An alternate regular expression can be supplied as the C<regexp> parameter
+during import.  The default pattern will match any of the named formats.
+
+The pattern must capture 6 groups in the appropriate order:
+year, month, day, hour, minute, second.
+If you're doing something more complex you probably ought to be using
+one of the modules listed in L<SEE ALSO>.
+
+=head2 parsegm
+
+  $seconds = parsegm($stamp);
+  @gmtime  = parsegm($stamp);
+
+This is the inverse of L</gmstamp>.
+It parses a timestamp (like the ones created by this module) and uses
+L<Time::Local/timegm> to turn it back into a seconds-since-epoch integer.
+
+=head2 parselocal
+
+  $seconds   = parselocal($stamp);
+  @localtime = parselocal($stamp);
+
+This is the inverse of L</localstamp>.
+It parses a timestamp (like the ones created by this module) and uses
+L<Time::Local/timelocal> to it them back into a seconds-since-epoch integer.
 
 =head1 SEE ALSO
 
@@ -379,7 +488,7 @@ L<Time::gmtime> - small object-oriented/named interface to C<gmtime()>
 
 =item *
 
-L<POSIX> - large module contained standard methods including C<strftime()>
+L<POSIX> - large module containing standard methods including C<strftime()>
 
 =item *
 
