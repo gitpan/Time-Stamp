@@ -7,17 +7,17 @@
 # This is free software; you can redistribute it and/or modify it under
 # the same terms as the Perl 5 programming language system itself.
 #
+use strict;
+use warnings;
+
 package Time::Stamp;
 BEGIN {
-  $Time::Stamp::VERSION = '1.001';
+  $Time::Stamp::VERSION = '1.002';
 }
 BEGIN {
   $Time::Stamp::AUTHORITY = 'cpan:RWSTAUNER';
 }
 # ABSTRACT: Easy, readable, efficient timestamp functions
-
-use strict;
-use warnings;
 
 # TODO: use collector?
 
@@ -66,7 +66,8 @@ my $formats = do {
 # sub format_time_array { sprintf(_format(shift), _ymdhms(@_)) }
 
 sub _build_localstamp {
-  my ($class, $name, $arg, $col) = @_;
+##my ( $class, $name, $arg, $col ) = @_;
+  my ( undef, undef, $arg, undef ) = @_;
   my $format = _format($arg);
   return sub {
     sprintf($format, _ymdhms(@_ > 1 ? @_ : CORE::localtime(@_ ? $_[0] : time)));
@@ -74,7 +75,8 @@ sub _build_localstamp {
 }
 
 sub _build_gmstamp {
-  my ($class, $name, $arg, $col) = @_;
+##my ( $class, $name, $arg, $col ) = @_;
+  my ( undef, undef, $arg, undef ) = @_;
   # add the Z for UTC (Zulu) time zone unless the numeric format is requested
   $arg = {tz => 'Z', %$arg}
     unless $arg->{format} && $arg->{format} eq 'numeric';
@@ -85,7 +87,8 @@ sub _build_gmstamp {
 }
 
 sub _build_parsestamp {
-  my ($class, $name, $arg, $col) = @_;
+##my ($class, $name, $arg, $col) = @_;
+  my ( undef, $name, $arg, undef ) = @_;
 
   # pre-compile the regexp
   my $regexp = exists $arg->{regexp}
@@ -166,7 +169,7 @@ Time::Stamp - Easy, readable, efficient timestamp functions
 
 =head1 VERSION
 
-version 1.001
+version 1.002
 
 =head1 SYNOPSIS
 
@@ -236,6 +239,8 @@ without incurring the resource cost of L<DateTime>
 
 So the aim of this module is to provide simple timestamp functions
 so that you can have easy-to-use, easy-to-read timestamps efficiently.
+
+=for test_synopsis my ( $file, $pattern, $stamp, $time );
 
 =head1 FORMAT
 
@@ -540,49 +545,49 @@ in addition to those websites please use your favorite search engine to discover
 
 Search CPAN
 
+The default CPAN search engine, useful to view POD in HTML format.
+
 L<http://search.cpan.org/dist/Time-Stamp>
 
 =item *
 
 RT: CPAN's Bug Tracker
 
+The RT ( Request Tracker ) website is the default bug/issue tracking system for CPAN.
+
 L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=Time-Stamp>
-
-=item *
-
-AnnoCPAN: Annotated CPAN documentation
-
-L<http://annocpan.org/dist/Time-Stamp>
 
 =item *
 
 CPAN Ratings
 
+The CPAN Ratings is a website that allows community ratings and reviews of Perl modules.
+
 L<http://cpanratings.perl.org/d/Time-Stamp>
 
 =item *
 
-CPAN Forum
+CPAN Testers
 
-L<http://cpanforum.com/dist/Time-Stamp>
+The CPAN Testers is a network of smokers who run automated tests on uploaded CPAN distributions.
 
-=item *
-
-CPANTS Kwalitee
-
-L<http://cpants.perl.org/dist/overview/Time-Stamp>
-
-=item *
-
-CPAN Testers Results
-
-L<http://cpantesters.org/distro/T/Time-Stamp.html>
+L<http://www.cpantesters.org/distro/T/Time-Stamp>
 
 =item *
 
 CPAN Testers Matrix
 
+The CPAN Testers Matrix is a website that provides a visual overview of the test results for a distribution on various Perls/platforms.
+
 L<http://matrix.cpantesters.org/?dist=Time-Stamp>
+
+=item *
+
+CPAN Testers Dependencies
+
+The CPAN Testers Dependencies is a website that shows a chart of the test results of all dependencies for a distribution.
+
+L<http://deps.cpantesters.org/?module=Time::Stamp>
 
 =back
 
@@ -595,9 +600,9 @@ progress on the request by the system.
 =head2 Source Code
 
 
-L<http://github.com/magnificent-tears/Time-Stamp/tree>
+L<http://github.com/rwstauner/Time-Stamp>
 
-  git clone git://github.com/magnificent-tears/Time-Stamp.git
+  git clone http://github.com/rwstauner/Time-Stamp
 
 =head1 AUTHOR
 
