@@ -48,12 +48,14 @@ sub pmver {
     return sprintf('%-45s => %-10s%-15s%s', $module, $pmver, $wanted, "\n");
 }
 
+eval { $v .= pmver('ExtUtils::MakeMaker','6.30') };
 eval { $v .= pmver('File::Find','any version') };
 eval { $v .= pmver('File::Temp','any version') };
-eval { $v .= pmver('Module::Build','0.3601') };
 eval { $v .= pmver('Sub::Exporter','0.982') };
 eval { $v .= pmver('Test::More','0.96') };
 eval { $v .= pmver('Time::Local','any version') };
+eval { $v .= pmver('strict','any version') };
+eval { $v .= pmver('warnings','any version') };
 
 
 

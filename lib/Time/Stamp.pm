@@ -11,8 +11,8 @@ use strict;
 use warnings;
 
 package Time::Stamp;
-BEGIN {
-  $Time::Stamp::VERSION = '1.002';
+{
+  $Time::Stamp::VERSION = '1.003';
 }
 BEGIN {
   $Time::Stamp::AUTHORITY = 'cpan:RWSTAUNER';
@@ -22,6 +22,7 @@ BEGIN {
 # TODO: use collector?
 
 use Sub::Exporter 0.982 -setup => {
+  -as => 'do_import',
   exports => [
     localstamp => \'_build_localstamp',
     gmstamp    => \'_build_gmstamp',
@@ -33,6 +34,11 @@ use Sub::Exporter 0.982 -setup => {
     parsers => [qw(parselocal parsegm)],
   ]
 };
+
+sub import {
+  @_ = map { /(local|gm)(?:stamp)?-(\w+)/ ? ($1.'stamp' => { format => $2 }) : $_ } @_;
+  goto &do_import;
+}
 
 # set up named formats with default values
 my $formats = do {
@@ -159,9 +165,11 @@ __PACKAGE__->import(qw(
 __END__
 =pod
 
-=for :stopwords Randy Stauner TODO timestamp gmstamp localstamp UTC parsegm parselocal cpan
-testmatrix url annocpan anno bugtracker rt cpants kwalitee diff irc mailto
-metadata placeholders
+=for :stopwords Randy Stauner ACKNOWLEDGEMENTS TODO timestamp gmstamp localstamp UTC
+parsegm parselocal cpan testmatrix url annocpan anno bugtracker rt cpants
+kwalitee diff irc mailto metadata placeholders metacpan
+
+=encoding utf-8
 
 =head1 NAME
 
@@ -169,7 +177,7 @@ Time::Stamp - Easy, readable, efficient timestamp functions
 
 =head1 VERSION
 
-version 1.002
+version 1.003
 
 =head1 SYNOPSIS
 
@@ -197,6 +205,9 @@ version 1.002
 
   $stamp = Time::Stamp::gmstamp($time);
   $time  = Time::Stamp::parsegm($stamp);
+
+  # use shortcuts for specifying desired format, useful for one-liners:
+  qx/perl -MTime::Stamp=local-compact -E 'say localstamp'/;
 
 =head1 DESCRIPTION
 
@@ -451,6 +462,36 @@ This is the inverse of L</localstamp>.
 It parses a timestamp (like the ones created by this module) and uses
 L<Time::Local/timelocal> to it them back into a seconds-since-epoch integer.
 
+=head2 SHORTCUTS
+
+There are also shortcuts available in the format of C<< type-format >>
+that export the appropriate function using the named format.
+
+For example:
+
+=over 4
+
+=item *
+
+C<local-compact> exports a L</localstamp> function using the C<compact> format
+
+=item *
+
+C<gm-easy> exports a L</gmstamp> function using the C<easy> format
+
+=back
+
+This makes the module easier to use on the command line:
+
+  perl -MTime::Stamp=local-compact -E 'say localstamp'
+
+Rather than:
+
+  perl -E 'use Time::Stamp localstamp => { format => "compact" }; say localstamp'
+
+Any of the predefined formats named in L</FORMAT>
+can be used in the shortcut notation.
+
 =head1 SEE ALSO
 
 =over 4
@@ -600,9 +641,9 @@ progress on the request by the system.
 =head2 Source Code
 
 
-L<http://github.com/rwstauner/Time-Stamp>
+L<https://github.com/rwstauner/Time-Stamp>
 
-  git clone http://github.com/rwstauner/Time-Stamp
+  git clone https://github.com/rwstauner/Time-Stamp.git
 
 =head1 AUTHOR
 

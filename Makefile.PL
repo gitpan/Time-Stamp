@@ -9,28 +9,29 @@ use ExtUtils::MakeMaker 6.30;
 
 
 my %WriteMakefileArgs = (
-  'ABSTRACT' => 'Easy, readable, efficient timestamp functions',
-  'AUTHOR' => 'Randy Stauner <rwstauner@cpan.org>',
-  'BUILD_REQUIRES' => {
-    'File::Find' => '0',
-    'File::Temp' => '0',
-    'ExtUtils::MakeMaker' => '6.30',
-    'Test::More' => '0.96'
+  "ABSTRACT" => "Easy, readable, efficient timestamp functions",
+  "AUTHOR" => "Randy Stauner <rwstauner\@cpan.org>",
+  "BUILD_REQUIRES" => {
+    "File::Find" => 0,
+    "File::Temp" => 0,
+    "Test::More" => "0.96"
   },
-  'CONFIGURE_REQUIRES' => {
-    'ExtUtils::MakeMaker' => '6.30'
+  "CONFIGURE_REQUIRES" => {
+    "ExtUtils::MakeMaker" => "6.30"
   },
-  'DISTNAME' => 'Time-Stamp',
-  'EXE_FILES' => [],
-  'LICENSE' => 'perl',
-  'NAME' => 'Time::Stamp',
-  'PREREQ_PM' => {
-    'Sub::Exporter' => '0.982',
-    'Time::Local' => '0'
+  "DISTNAME" => "Time-Stamp",
+  "EXE_FILES" => [],
+  "LICENSE" => "perl",
+  "NAME" => "Time::Stamp",
+  "PREREQ_PM" => {
+    "Sub::Exporter" => "0.982",
+    "Time::Local" => 0,
+    "strict" => 0,
+    "warnings" => 0
   },
-  'VERSION' => '1.002',
-  'test' => {
-    'TESTS' => 't/*.t'
+  "VERSION" => "1.003",
+  "test" => {
+    "TESTS" => "t/*.t"
   }
 );
 
