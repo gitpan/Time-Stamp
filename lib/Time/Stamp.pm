@@ -12,7 +12,7 @@ use warnings;
 
 package Time::Stamp;
 {
-  $Time::Stamp::VERSION = '1.003';
+  $Time::Stamp::VERSION = '1.200';
 }
 BEGIN {
   $Time::Stamp::AUTHORITY = 'cpan:RWSTAUNER';
@@ -36,7 +36,18 @@ use Sub::Exporter 0.982 -setup => {
 };
 
 sub import {
-  @_ = map { /(local|gm)(?:stamp)?-(\w+)/ ? ($1.'stamp' => { format => $2 }) : $_ } @_;
+  @_ = map {
+    /(local|gm)(?:stamp)?((?:-\w+)+)/
+    ? ($1.'stamp' => {
+        map  {
+          /^([um]s)$/ ? ($1 => 1)
+            : (format => $_)
+        }
+        grep { $_ }
+          split(/-/, $2)
+      })
+    : $_
+  } @_;
   goto &do_import;
 }
 
@@ -74,22 +85,66 @@ my $formats = do {
 sub _build_localstamp {
 ##my ( $class, $name, $arg, $col ) = @_;
   my ( undef, undef, $arg, undef ) = @_;
-  my $format = _format($arg);
-  return sub {
-    sprintf($format, _ymdhms(@_ > 1 ? @_ : CORE::localtime(@_ ? $_[0] : time)));
-  };
+
+  return _generate_code(local => $arg);
 }
 
 sub _build_gmstamp {
 ##my ( $class, $name, $arg, $col ) = @_;
   my ( undef, undef, $arg, undef ) = @_;
+
   # add the Z for UTC (Zulu) time zone unless the numeric format is requested
   $arg = {tz => 'Z', %$arg}
     unless $arg->{format} && $arg->{format} eq 'numeric';
+
+  return _generate_code(gm => $arg);
+}
+
+# TODO: could these subs be faster with a no_args option? would only save 2 if's
+sub _generate_code {
+  my ($which, $arg) = @_;
+  $arg = { %$arg };
+  # note: mu is 03BC
+  $arg->{frac} ||= $arg->{us} ? 6 : $arg->{ms} ? 3 : 0;
+
   my $format = _format($arg);
-  return sub {
-    sprintf($format, _ymdhms(@_ > 1 ? @_ : CORE::gmtime(   @_ ? $_[0] : time)));
+
+  my $code;
+  my $vars = {
+    which => $which,
   };
+  if( $arg->{frac} ){
+    $vars->{frac} = $arg->{frac};
+    # always display a fraction if requested
+    $vars->{gettime} = _have_hires()
+      ? 'Time::HiRes::gettimeofday()'
+      # if HiRes fails to load use whole number precision
+      : '(CORE::time(), 0)';
+    $code = <<'CODE';
+      sub {
+        # localtime() will not preserve the fraction, so separate it
+        my ($t, $f) = @_ ? (split(/\./, $_[0]), 0) : {{gettime}};
+        my @lt = _ymdhms(@_ > 1 ? @_ : CORE::{{which}}time($t));
+
+        # use %.6f for precision, but strip leading zero
+        return sprintf($format, @lt, substr(sprintf('%.{{frac}}f', '.'.$f), 1));
+      };
+CODE
+  }
+  # if not using fraction return a more efficient sub
+  else {
+    $code = <<'CODE';
+      sub {
+        return sprintf($format,
+          _ymdhms(@_ > 1 ? @_ : CORE::{{which}}time(@_ ? $_[0] : time))
+        );
+      };
+CODE
+  }
+  # poor man's template (easier than sprintf or escaping sigils)
+  $code =~ s/\{\{(\w+)\}\}/$vars->{$1}/g;
+
+  return do { eval $code or die $@ }; ## no critic (StringyEval)
 }
 
 sub _build_parsestamp {
@@ -100,7 +155,7 @@ sub _build_parsestamp {
   my $regexp = exists $arg->{regexp}
     ? qr/$arg->{regexp}/
     : qr/^ (\d{4}) \D* (\d{2}) \D* (\d{2}) \D*
-           (\d{2}) \D* (\d{2}) \D* (\d{2} (?:\.\d+)?) .* $/x;
+           (\d{2}) \D* (\d{2}) \D* (\d{2}) (?:\.(\d+))? .* $/x;
 
   require Time::Local; # core
   my $time = $name eq 'parsegm'
@@ -109,17 +164,42 @@ sub _build_parsestamp {
 
   return sub {
     my ($stamp) = @_;
-    # coerce strings into numbers (map { int } would not work for fractions)
-    my @time = reverse map { $_ + 0 } ($stamp =~ $regexp);
+    my ($frac, @time) = reverse ($stamp =~ $regexp);
 
     # if the regexp didn't match (empty list) give up now
     return
       if !@time;
 
+    # regexp didn't have 7th capture group (for fraction)
+    if( @time < 6 ){
+      unshift @time, $frac;
+      # if there was a fraction in group 6 separate it
+      # or timelocal may produce something unexpected.
+      # if there was no fraction $frac will be undef
+      ($time[0], $frac) = split(/\./, $time[0]);
+    }
+
+    # coerce strings into numbers (map { int } would not work for fractions)
+    @time = map { $_ + 0 } @time;
+
     $time[5] -= 1900; # year
     $time[4] -= 1;    # month
 
-    return wantarray ? @time : &$time(@time);
+    # make sure it starts with a dot (whether it has one or not)
+    $frac =~ s/^0?\.?/./
+      if defined $frac;
+
+    if( wantarray ){
+      $time[0] .= $frac
+        if defined $frac;
+      return @time;
+    }
+    else {
+      my $ts = &$time(@time);
+      $ts .= $frac
+        if defined $frac;
+      return $ts;
+    }
   };
 }
 
@@ -137,10 +217,13 @@ sub _format {
 
   # TODO: $opt{tz} = tz_offset() if $opt{guess_tz};
 
+  # sadly "%02.6f" does not zero-pad the integer portion, so we have to be trickier
+
   return
     join($opt{date_sep}, qw(%04d %02d %02d)) .
     $opt{dt_sep} .
     join($opt{time_sep}, qw(%02d %02d %02d)) .
+    ($opt{frac} ? '%s' : '') .
     ($opt{tz} ? $opt{tz_sep} . $opt{tz} : '')
   ;
 }
@@ -148,6 +231,18 @@ sub _format {
 # convert *time() arrays to something ready to send to sprintf
 sub _ymdhms {
   return ($_[5] + 1900, $_[4] + 1, @_[3, 2, 1, 0]);
+}
+
+my $_have_hires;
+sub _have_hires {
+  if( !defined($_have_hires) ){
+    local $@;
+    $_have_hires = eval { require Time::HiRes; 1 } || do {
+      warn "Time::HiRes requested but failed to load: $@";
+      0;
+    };
+  }
+  return $_have_hires;
 }
 
 # define default localstamp and gmstamp in this package
@@ -166,8 +261,8 @@ __END__
 =pod
 
 =for :stopwords Randy Stauner ACKNOWLEDGEMENTS TODO timestamp gmstamp localstamp UTC
-parsegm parselocal cpan testmatrix url annocpan anno bugtracker rt cpants
-kwalitee diff irc mailto metadata placeholders metacpan
+parsegm parselocal 6th 7th cpan testmatrix url annocpan anno bugtracker rt
+cpants kwalitee diff irc mailto metadata placeholders metacpan
 
 =encoding utf-8
 
@@ -177,19 +272,24 @@ Time::Stamp - Easy, readable, efficient timestamp functions
 
 =head1 VERSION
 
-version 1.003
+version 1.200
 
 =head1 SYNOPSIS
 
-  # import customized functions to make simple, readable timestamps
+  # import customized functions to make easy-to-use timestamps
 
   use Time::Stamp 'gmstamp';
   my $now = gmstamp();
   my $mtime = gmstamp( (stat($file))[9] );
+    # $mtime is something like "2012-05-18T10:52:32Z"
+
 
   use Time::Stamp localstamp => { -as => 'ltime', format => 'compact' };
+    # ltime() will return something like "20120518_105232"
 
-  use Time::Stamp -stamps => { dt_sep => ' ', date_sep => '/' };
+  use Time::Stamp -stamps => { dt_sep => ' ', date_sep => '/', us => 1 };
+    # localstamp() will return something like "2012/05/18 10:52:32.123456"
+
 
   # inverse functions to parse the stamps
 
@@ -200,19 +300,25 @@ version 1.003
 
   use Time::Stamp -parsers => { regexp => qr/$pattern/ };
 
+
   # the default configurations of each function
   # are available without importing into your namespace
 
   $stamp = Time::Stamp::gmstamp($time);
   $time  = Time::Stamp::parsegm($stamp);
 
+
   # use shortcuts for specifying desired format, useful for one-liners:
   qx/perl -MTime::Stamp=local-compact -E 'say localstamp'/;
+  # with milliseconds:
+  qx/perl -MTime::Stamp=local-compact-ms -E 'say localstamp'/;
+  # with microseconds:
+  qx/perl -MTime::Stamp=local-compact-us -E 'say localstamp'/;
 
 =head1 DESCRIPTION
 
 This module makes it easy to include timestamp functions
-that are simple, easily readable, and fast.
+that are simple, easy to read, easy to parse, and fast.
 For simple timestamps perl's built-in functions are all you need:
 L<time|perlfunc/time>,
 L<gmtime|perlfunc/gmtime> (or L<localtime|perlfunc/localtime>),
@@ -283,6 +389,18 @@ C<tz_sep>   - Character separating time and timezone; Default: C<''>
 =item *
 
 C<tz> - Time zone designator;  Default: C<''>
+
+=item *
+
+C<frac> - Digits of fractional seconds to show; Default: no fraction
+
+=item *
+
+C<ms> - Boolean shortcut: milliseconds; If true, same as C<< frac => 3 >>
+
+=item *
+
+C<us> - Boolean shortcut: microseconds; If true, same as C<< frac => 6 >>
 
 =back
 
@@ -361,18 +479,28 @@ Each timestamp function will return a string according to the time as follows:
 
 =item *
 
-If called with no arguments C<time()> (I<now>) will be used.
+If called with no arguments C<time()> (I<now>) will be used
+
+(or L<Time::HiRes/gettimeofday> for fractional seconds).
 
 =item *
 
 A single argument should be an integer
 (like that returned from C<time()> or C<stat()>).
 
+If a floating point number is provided
+(and fractional seconds were part of the format)
+the fraction will be preserved (according to the specified precision).
+
 =item *
 
 More than one argument is assumed to be the list returned from
 C<gmtime()> or C<localtime()> which can be useful if you previously called
 the function and don't want to do it again.
+
+If the first argument (seconds) is a floating point number
+(and fractional seconds were part of the format)
+the fraction will be preserved (according to the specified precision).
 
 =back
 
@@ -444,6 +572,16 @@ year, month, day, hour, minute, second.
 If you're doing something more complex you probably ought to be using
 one of the modules listed in L<SEE ALSO>.
 
+An optional 7th group can be used to capture the fractional seconds.
+If only 6 groups are used, the 6th capture (seconds)
+will be checked for a fraction.
+The fraction will be separated from the whole number
+before being passed through the L<Time::Local> functions
+then appended to the result
+(the number returned in scalar context,
+or to the first element returned in list context)
+in an attempt to provide the most expected/reliable result.
+
 =head2 parsegm
 
   $seconds = parsegm($stamp);
@@ -491,6 +629,20 @@ Rather than:
 
 Any of the predefined formats named in L</FORMAT>
 can be used in the shortcut notation.
+
+Additionally recognized flags include:
+
+=over 4
+
+=item *
+
+C<us> adds microseconds (6 digit precision): C<< local-easy-us >>
+
+=item *
+
+C<ms> adds milliseconds (3 digit precision): C<< gm-ms >>
+
+=back
 
 =head1 SEE ALSO
 
@@ -560,10 +712,6 @@ Allow an option for overwriting the globals
 so that calling C<localtime> in scalar context will return
 a stamp in the desired format.
 The normal values will be returned in list context.
-
-=item *
-
-Include the fractional portion of the seconds if present?
 
 =back
 

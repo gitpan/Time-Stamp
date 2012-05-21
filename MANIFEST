@@ -12,6 +12,7 @@ t/00-compile.t
 t/000-report-versions-tiny.t
 t/exports.t
 t/format.t
+t/hires.t
 t/imports.t
 t/parse.t
 t/time.t
