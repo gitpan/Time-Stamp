@@ -1,5 +1,14 @@
 Revision history for Time-Stamp
 
+1.300     2013-01-10T03:34:01Z
+
+  [Bug Fixes]
+  - Preserve leading zeros in fractions when microseconds
+    are less_than 100_000.
+
+  - Drop the 'CORE::' prefix from calls to built-ins
+    so that time() can be overridden (mocked in tests, etc).
+
 1.200     2012-05-21T18:02:33Z
 
   - Enable fractional seconds in timestamps

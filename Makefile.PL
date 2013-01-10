@@ -12,9 +12,13 @@ my %WriteMakefileArgs = (
   "ABSTRACT" => "Easy, readable, efficient timestamp functions",
   "AUTHOR" => "Randy Stauner <rwstauner\@cpan.org>",
   "BUILD_REQUIRES" => {
+    "ExtUtils::MakeMaker" => 0,
     "File::Find" => 0,
+    "File::Spec::Functions" => 0,
     "File::Temp" => 0,
-    "Test::More" => "0.96"
+    "List::Util" => 0,
+    "Test::More" => "0.96",
+    "subs" => 0
   },
   "CONFIGURE_REQUIRES" => {
     "ExtUtils::MakeMaker" => "6.30"
@@ -29,7 +33,7 @@ my %WriteMakefileArgs = (
     "strict" => 0,
     "warnings" => 0
   },
-  "VERSION" => "1.200",
+  "VERSION" => "1.300",
   "test" => {
     "TESTS" => "t/*.t"
   }

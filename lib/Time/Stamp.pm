@@ -12,8 +12,10 @@ use warnings;
 
 package Time::Stamp;
 {
-  $Time::Stamp::VERSION = '1.200';
+  $Time::Stamp::VERSION = '1.300';
 }
+# git description: v1.200-5-gd4b4217
+
 BEGIN {
   $Time::Stamp::AUTHORITY = 'cpan:RWSTAUNER';
 }
@@ -117,14 +119,18 @@ sub _generate_code {
     $vars->{frac} = $arg->{frac};
     # always display a fraction if requested
     $vars->{gettime} = _have_hires()
-      ? 'Time::HiRes::gettimeofday()'
+      # gettimeofday() returns microseconds, so we need six digits to stringify
+      # which means we need a sprintf somewhere
+      ? 'do { my @t = Time::HiRes::gettimeofday(); $t[1] = sprintf "%06d", $t[1]; @t }'
       # if HiRes fails to load use whole number precision
-      : '(CORE::time(), 0)';
+      : '(time(), 0)';
+
     $code = <<'CODE';
       sub {
         # localtime() will not preserve the fraction, so separate it
         my ($t, $f) = @_ ? (split(/\./, $_[0]), 0) : {{gettime}};
-        my @lt = _ymdhms(@_ > 1 ? @_ : CORE::{{which}}time($t));
+
+        my @lt = _ymdhms(@_ > 1 ? @_ : {{which}}time($t));
 
         # use %.6f for precision, but strip leading zero
         return sprintf($format, @lt, substr(sprintf('%.{{frac}}f', '.'.$f), 1));
@@ -136,7 +142,7 @@ CODE
     $code = <<'CODE';
       sub {
         return sprintf($format,
-          _ymdhms(@_ > 1 ? @_ : CORE::{{which}}time(@_ ? $_[0] : time))
+          _ymdhms(@_ > 1 ? @_ : {{which}}time(@_ ? $_[0] : time))
         );
       };
 CODE
@@ -256,15 +262,15 @@ __PACKAGE__->import(qw(
 
 1;
 
-
 __END__
+
 =pod
+
+=encoding utf-8
 
 =for :stopwords Randy Stauner ACKNOWLEDGEMENTS TODO timestamp gmstamp localstamp UTC
 parsegm parselocal 6th 7th cpan testmatrix url annocpan anno bugtracker rt
 cpants kwalitee diff irc mailto metadata placeholders metacpan
-
-=encoding utf-8
 
 =head1 NAME
 
@@ -272,7 +278,7 @@ Time::Stamp - Easy, readable, efficient timestamp functions
 
 =head1 VERSION
 
-version 1.200
+version 1.300
 
 =head1 SYNOPSIS
 
@@ -491,6 +497,15 @@ A single argument should be an integer
 If a floating point number is provided
 (and fractional seconds were part of the format)
 the fraction will be preserved (according to the specified precision).
+
+B<Note>: You may want to stringify a floating point number yourself
+in order to control the precision rather than be subject
+to the rounding of the default stringification:
+
+  localstamp(sprintf "%.6f", $timestamp)
+
+See "NOTE 2" in the description of C<time()> in L<Time::HiRes>
+for more information.
 
 =item *
 
@@ -805,4 +820,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-
